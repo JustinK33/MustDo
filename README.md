@@ -1,4 +1,4 @@
-# ToDoMax
+# MustDo
 
 A dark-themed personal tracker that grew from a todo list into a small health-and-productivity dashboard: tasks, goals, nutrition, training, and daily wellness logs, all under one login.
 
