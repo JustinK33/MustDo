@@ -52,21 +52,17 @@ Each tick is bounded by a 30 second timeout and recovers from its own panics, be
 
 Reading back through the history, almost every fix in this repo is the same bug wearing a different hat: something failed and said nothing.
 
-**A rejected request with no error handler looks exactly like a frozen UI.** `apiFetch` threw correctly on any non-2xx or network failure, and nothing caught it. So a dropped connection or an expired session meant saving, deleting, or completing a task did nothing at all, with the modal just sitting there. The checkbox case was worse, because the box stayed visually ticked for a completion that never persisted. It now surfaces the error and reverts the checkbox to match reality.
+**A rejected request with no error handler looks exactly like a frozen UI.**
+`apiFetch` threw correctly on any non-2xx or network failure and nothing caught it, so an expired session meant saving or completing a task did nothing at all, with the modal just sitting there.
+The checkbox was worse, staying visually ticked for a completion that never persisted, and it now reverts to match reality.
 
-**`await` in a refresh function is an accidental dependency.** `refreshView()` awaited `loadTasks()` first and only reached `refreshHero()` if that succeeded. I found this on the live site while it couldn't reach its backend over an unrelated CORS problem: the hero's date text, which needs no network call whatsoever, wasn't rendering either. Four independent refreshes now run under `Promise.allSettled`, so one failing fetch can't take the others with it, and an error still surfaces if any of them failed.
+**`await` in a refresh function is an accidental dependency.**
+`refreshView()` awaited `loadTasks()` and only reached `refreshHero()` if that succeeded, so during an unrelated CORS outage the hero's date text, which needs no network call at all, stopped rendering too.
+Four independent refreshes now run under `Promise.allSettled`.
 
-**Supabase's `signUp()` can succeed without giving you a session.** With email confirmation required, it returns successfully and no session, and my code redirected to `index.html` regardless, where `requireSession()` immediately bounced the user back to the login page with no explanation. It looked exactly like a failed signup. It says "check your email" now, and both buttons disable during the request so you can't double-submit.
-
-**A reminder that fires for a completed task is worse than no reminder.** `DueReminders` never checked completion status, so a task you finished before its reminder window closed still got emailed as if pending, for both recurring and non-recurring tasks. That code path had zero test coverage at the time, which is the more useful thing to notice: the background job was the least tested and most autonomous part of the system.
-
-**A negative number can make a time window mathematically unreachable.** `reminder_minutes_before` accepted negatives, which put the reminder window in the future relative to the due time, so the reminder simply never fired and nothing anywhere reported a problem. It's rejected at the boundary now, with a test that says so.
-
-**Raw driver errors in a 500 body leak your schema.** Unexpected failures were returning the driver's error text straight to the client, which can include table and column names. Those are logged server-side and answered generically now. Validation errors still return their specific message, because a 400 is meant to be read by whoever caused it.
-
-**Stubbing the parts of Supabase that CI lacks beats keeping a CI-only migration.** The plain Postgres service container has no `auth.users` table and no `auth.uid()` function, so the real migration files failed to apply and the integration tests couldn't run. Rather than maintaining a second copy of the schema for CI, the workflow stubs just enough of `auth`, a users table for the foreign key and a no-op `uid()` so the RLS policies create. CI now runs the exact migration file that production runs.
-
-**Grouping by a display string merges data that isn't the same.** Category grouping keyed on the label, so tasks genuinely named "Other" fell into the same bucket as tasks with no category at all, and legacy lowercase categories became an uncoloured unordered pile because matching was case-sensitive in the grouping but not in the edit form. Null and "Other" are distinct keys now, and matching is case-insensitive in both places.
+**Supabase's `signUp()` can succeed without giving you a session.**
+With email confirmation required it returns successfully and no session, and redirecting to `index.html` anyway meant `requireSession()` bounced the user straight back to login, which looked exactly like a failed signup.
+It says "check your email" now, and both buttons disable during the request.
 
 ## Quick start
 
